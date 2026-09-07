@@ -8,6 +8,7 @@
 #include "EnhancedInputComponent.h"
 #include "InputActionValue.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Interaction/MouseInteractionComponent.h"
 #include "MouseMouse.h"
 
 AMouseMouseCharacter::AMouseMouseCharacter()
@@ -15,6 +16,9 @@ AMouseMouseCharacter::AMouseMouseCharacter()
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(55.f, 96.0f);
 	
+	// Create the interaction component
+	InteractionComponent = CreateDefaultSubobject<UMouseInteractionComponent>(TEXT("Interaction Component"));
+
 	// Create the first person mesh that will be viewed only by this character's owner
 	FirstPersonMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("First Person Mesh"));
 

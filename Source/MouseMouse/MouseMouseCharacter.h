@@ -11,7 +11,9 @@ class UInputComponent;
 class USkeletalMeshComponent;
 class UCameraComponent;
 class UInputAction;
+class UMouseInteractionComponent;
 struct FInputActionValue;
+
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -30,6 +32,10 @@ class AMouseMouseCharacter : public ACharacter
 	/** First person camera */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	UCameraComponent* FirstPersonCameraComponent;
+
+	/** Handles player interaction detection and execution */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	UMouseInteractionComponent* InteractionComponent;
 
 protected:
 
@@ -89,6 +95,9 @@ public:
 
 	/** Returns first person camera component **/
 	UCameraComponent* GetFirstPersonCameraComponent() const { return FirstPersonCameraComponent; }
+
+	/** Returns interaction component **/
+	UMouseInteractionComponent* GetInteractionComponent() const { return InteractionComponent; }
 
 };
 
