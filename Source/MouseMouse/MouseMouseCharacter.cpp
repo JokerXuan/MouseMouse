@@ -1,14 +1,21 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "MouseMouseCharacter.h"
+
 #include "Animation/AnimInstance.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SceneComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/PrimitiveComponent.h"
 #include "EnhancedInputComponent.h"
 #include "InputActionValue.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Interaction/MouseInteractionComponent.h"
+#include "Interaction/MouseInteractable.h"
+#include "Net/UnrealNetwork.h"
+#include "Items/MousePickupActor.h"
+
 #include "MouseMouse.h"
 
 AMouseMouseCharacter::AMouseMouseCharacter()
@@ -37,6 +44,11 @@ AMouseMouseCharacter::AMouseMouseCharacter()
 	FirstPersonCameraComponent->FirstPersonFieldOfView = 70.0f;
 	FirstPersonCameraComponent->FirstPersonScale = 0.6f;
 
+	// Create the point where held objects will be attached
+	HoldPoint = CreateDefaultSubobject<USceneComponent>(TEXT("Hold Point"));
+	HoldPoint->SetupAttachment(FirstPersonCameraComponent);
+	HoldPoint->SetRelativeLocation(FVector(100.0f, 0.0f, -20.0f));
+
 	// configure the character comps
 	GetMesh()->SetOwnerNoSee(true);
 	GetMesh()->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::WorldSpaceRepresentation;
@@ -48,6 +60,134 @@ AMouseMouseCharacter::AMouseMouseCharacter()
 	GetCharacterMovement()->AirControl = 0.5f;
 }
 
+void AMouseMouseCharacter::GetLifetimeReplicatedProps(
+	TArray<FLifetimeProperty>& OutLifetimeProps
+) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(
+		AMouseMouseCharacter,
+		HeldActor
+	);
+}
+
+bool AMouseMouseCharacter::TryPickupActor(
+	AActor* ActorToPickup
+)
+{
+	if (!HasAuthority())
+	{
+		return false;
+	}
+
+	if (!IsValid(ActorToPickup))
+	{
+		return false;
+	}
+
+	if (IsValid(HeldActor))
+	{
+		return false;
+	}
+
+	if (!HoldPoint)
+	{
+		return false;
+	}
+
+	if (ActorToPickup == this)
+	{
+		return false;
+	}
+
+	// Only MousePickupActor can use the pickup system
+	AMousePickupActor* PickupActor =
+		Cast<AMousePickupActor>(ActorToPickup);
+
+	if (!PickupActor)
+	{
+		return false;
+	}
+
+	// Prevent two characters from holding the same item
+	if (IsValid(PickupActor->GetHolder()))
+	{
+		return false;
+	}
+
+	// Character authoritative state
+	HeldActor = PickupActor;
+
+	// Gameplay / network ownership
+	PickupActor->SetOwner(this);
+
+	// PickupActor is responsible for physics,
+	// collision and attachment.
+	PickupActor->SetHolder(this);
+
+	ForceNetUpdate();
+	PickupActor->ForceNetUpdate();
+
+	UE_LOG(
+		LogMouseMouse,
+		Log,
+		TEXT("Server: '%s' picked up '%s'."),
+		*GetNameSafe(this),
+		*GetNameSafe(PickupActor)
+	);
+
+	return true;
+}
+
+bool AMouseMouseCharacter::TryDropHeldActor()
+{
+	if (!HasAuthority())
+	{
+		return false;
+	}
+
+	if (!IsValid(HeldActor))
+	{
+		return false;
+	}
+
+	AMousePickupActor* PickupActor =
+		Cast<AMousePickupActor>(HeldActor);
+
+	if (!PickupActor)
+	{
+		return false;
+	}
+
+	// Save before clearing Character state
+	AActor* ActorToDrop = HeldActor;
+
+	// Character no longer holds anything
+	HeldActor = nullptr;
+
+	// Remove Gameplay / network ownership
+	ActorToDrop->SetOwner(nullptr);
+
+	// nullptr means "dropped".
+	// MousePickupActor will detach itself,
+	// enable collision and enable physics.
+	PickupActor->SetHolder(nullptr);
+
+	ForceNetUpdate();
+	ActorToDrop->ForceNetUpdate();
+
+	UE_LOG(
+		LogMouseMouse,
+		Log,
+		TEXT("Server: '%s' dropped '%s'."),
+		*GetNameSafe(this),
+		*GetNameSafe(ActorToDrop)
+	);
+
+	return true;
+}
+
 void AMouseMouseCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {	
 	// Set up action bindings
@@ -56,6 +196,18 @@ void AMouseMouseCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 		// Jumping
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &AMouseMouseCharacter::DoJumpStart);
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &AMouseMouseCharacter::DoJumpEnd);
+
+		// Interacting
+		if (InteractAction)
+		{
+			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &AMouseMouseCharacter::InteractInput);
+		}
+
+		// Dropping held item
+		if (DropAction)
+		{
+			EnhancedInputComponent->BindAction(DropAction, ETriggerEvent::Started, this, &AMouseMouseCharacter::DropInput);
+		}
 
 		// Moving
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AMouseMouseCharacter::MoveInput);
@@ -89,6 +241,162 @@ void AMouseMouseCharacter::LookInput(const FInputActionValue& Value)
 	// pass the axis values to the aim input
 	DoAim(LookAxisVector.X, LookAxisVector.Y);
 
+}
+
+void AMouseMouseCharacter::InteractInput()
+{
+	if (!InteractionComponent)
+	{
+		return;
+	}
+
+	AActor* TargetActor = InteractionComponent->FindInteractable();
+
+	if (!TargetActor)
+	{
+		return;
+	}
+
+	if (HasAuthority())
+	{
+		TryExecuteInteraction(TargetActor);
+	}
+	else
+	{
+		ServerInteract(TargetActor);
+	}
+}
+
+void AMouseMouseCharacter::DropInput()
+{
+	if (HasAuthority())
+	{
+		TryDropHeldActor();
+	}
+	else
+	{
+		ServerDropHeldActor();
+	}
+}
+
+void AMouseMouseCharacter::ServerInteract_Implementation(AActor* TargetActor)
+{
+	TryExecuteInteraction(TargetActor);
+}
+
+void AMouseMouseCharacter::ServerDropHeldActor_Implementation()
+{
+	TryDropHeldActor();
+}
+
+void AMouseMouseCharacter::TryExecuteInteraction(
+	AActor* TargetActor)
+{
+	// 这个函数只允许服务器真正执行 Gameplay 交互
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (!InteractionComponent)
+	{
+		return;
+	}
+
+	// 目标必须仍然存在
+	if (!IsValid(TargetActor))
+	{
+		return;
+	}
+
+	// 目标必须真的实现 MouseInteractable
+	if (!TargetActor->GetClass()->ImplementsInterface(
+		UMouseInteractable::StaticClass()))
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+
+	if (!World)
+	{
+		return;
+	}
+
+	// 获取服务器认为的玩家视点
+	FVector ViewLocation;
+	FRotator ViewRotation;
+
+	GetActorEyesViewPoint(
+		ViewLocation,
+		ViewRotation
+	);
+
+	// 给网络延迟和 Actor Pivot 留一点容差
+	const float MaxInteractionDistance =
+		InteractionComponent->GetInteractionDistance() + 100.0f;
+
+	const float DistanceSquared =
+		FVector::DistSquared(
+			ViewLocation,
+			TargetActor->GetActorLocation()
+		);
+
+	if (DistanceSquared >
+		FMath::Square(MaxInteractionDistance))
+	{
+		UE_LOG(
+			LogMouseMouse,
+			Warning,
+			TEXT("Server rejected interaction: target '%s' is too far away."),
+			*GetNameSafe(TargetActor)
+		);
+
+		return;
+	}
+
+	// 再检查玩家和目标之间有没有墙或其他阻挡物
+	FHitResult HitResult;
+
+	FCollisionQueryParams QueryParams(
+		SCENE_QUERY_STAT(ServerInteractionTrace),
+		false,
+		this
+	);
+
+	const bool bHit =
+		World->LineTraceSingleByChannel(
+			HitResult,
+			ViewLocation,
+			TargetActor->GetActorLocation(),
+			ECC_Visibility,
+			QueryParams
+		);
+
+	if (!bHit || HitResult.GetActor() != TargetActor)
+	{
+		UE_LOG(
+			LogMouseMouse,
+			Warning,
+			TEXT("Server rejected interaction: target '%s' is blocked."),
+			*GetNameSafe(TargetActor)
+		);
+
+		return;
+	}
+
+	UE_LOG(
+		LogMouseMouse,
+		Log,
+		TEXT("Server accepted interaction with: %s"),
+		*GetNameSafe(TargetActor)
+	);
+
+	// 所有验证通过以后，才真正执行 Gameplay 交互
+	IMouseInteractable::Execute_Interact(
+		TargetActor,
+		this
+	);
 }
 
 void AMouseMouseCharacter::DoAim(float Yaw, float Pitch)

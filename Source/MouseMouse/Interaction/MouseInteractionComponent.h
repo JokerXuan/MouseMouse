@@ -16,14 +16,15 @@ public:
 	// Sets default values for this component's properties
 	UMouseInteractionComponent();
 
-	/**
-	 * 从玩家第一人称摄像机向前检测一个可交互 Actor。
-	 *
-	 * @return
-	 * 如果找到实现 MouseInteractable 接口的 Actor，则返回该 Actor；
-	 * 否则返回 nullptr。
-	 */
+	//如果找到实现 MouseInteractable 接口的 Actor，则返回该 Actor；
 	AActor* FindInteractable() const;
+
+	float GetInteractionDistance() const
+	{
+		return InteractionDistance;
+	}
+
+
 
 protected:
 	/** 玩家最大交互距离，单位为厘米 */
