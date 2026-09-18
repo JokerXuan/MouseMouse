@@ -8,7 +8,7 @@
 #include "MousePickupActor.generated.h"
 
 class UStaticMeshComponent;
-class AMouseMouseCharacter;
+class ACharacter;
 
 UCLASS()
 class MOUSEMOUSE_API AMousePickupActor
@@ -28,9 +28,9 @@ public:
 	 * Server sets who currently holds this item.
 	 * nullptr means the item is dropped.
 	 */
-	void SetHolder(AMouseMouseCharacter* NewHolder);
+	void SetHolder(ACharacter* NewHolder);
 
-	AMouseMouseCharacter* GetHolder() const
+	ACharacter* GetHolder() const
 	{
 		return HolderCharacter;
 	}
@@ -50,7 +50,7 @@ protected:
 
 	/** Character currently holding this item */
 	UPROPERTY(ReplicatedUsing = OnRep_HolderCharacter)
-	TObjectPtr<AMouseMouseCharacter> HolderCharacter;
+	TObjectPtr<ACharacter> HolderCharacter;
 
 	UFUNCTION()
 	void OnRep_HolderCharacter();

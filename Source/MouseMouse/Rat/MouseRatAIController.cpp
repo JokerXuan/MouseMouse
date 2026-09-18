@@ -115,7 +115,7 @@ void AMouseRatAIController::SearchForFood()
 
 	MoveToActor(
 		Food,
-		10.0f,
+		80.0f,
 		true,
 		true,
 		true

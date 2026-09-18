@@ -4,6 +4,7 @@
 #include "Rat/MouseRatCharacter.h"
 
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Components/SceneComponent.h"
 #include "Rat/MouseRatAIController.h"
 
 
@@ -14,6 +15,16 @@ AMouseRatCharacter::AMouseRatCharacter()
 	PrimaryActorTick.bCanEverTick = false;
 
 	bReplicates = true;
+
+	CarryPoint = CreateDefaultSubobject<USceneComponent>(
+		TEXT("Carry Point")
+	);
+
+	CarryPoint->SetupAttachment(GetRootComponent());
+
+	CarryPoint->SetRelativeLocation(
+		FVector(15.0f, 0.0f, 0.0f)
+	);
 
 	AIControllerClass =
 		AMouseRatAIController::StaticClass();

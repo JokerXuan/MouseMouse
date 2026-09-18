@@ -6,6 +6,8 @@
 #include "GameFramework/Character.h"
 #include "MouseRatCharacter.generated.h"
 
+class USceneComponent;
+
 UCLASS()
 class MOUSEMOUSE_API AMouseRatCharacter : public ACharacter
 {
@@ -15,4 +17,18 @@ public:
 	// Sets default values for this character's properties
 	AMouseRatCharacter();
 
+	USceneComponent* GetCarryPoint() const
+	{
+		return CarryPoint;
+	}
+
+protected:
+
+	/** Point where carried items are attached */
+	UPROPERTY(
+		VisibleAnywhere,
+		BlueprintReadOnly,
+		Category = "Components"
+	)
+	TObjectPtr<USceneComponent> CarryPoint;
 };

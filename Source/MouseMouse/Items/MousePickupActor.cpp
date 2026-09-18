@@ -4,6 +4,7 @@
 
 #include "Components/StaticMeshComponent.h"
 #include "MouseMouseCharacter.h"
+#include "Rat/MouseRatCharacter.h"
 #include "Net/UnrealNetwork.h"
 
 
@@ -34,7 +35,7 @@ void AMousePickupActor::GetLifetimeReplicatedProps(
 }
 
 void AMousePickupActor::SetHolder(
-	AMouseMouseCharacter* NewHolder
+	ACharacter* NewHolder
 )
 {
 	if (!HasAuthority())
@@ -70,11 +71,28 @@ void AMousePickupActor::ApplyHolderState()
 
 		SetActorEnableCollision(false);
 
-		if (USceneComponent* HoldPoint =
-			HolderCharacter->GetHoldPoint())
+		USceneComponent* AttachPoint = nullptr;
+
+		// Held by player
+		if (AMouseMouseCharacter* PlayerCharacter =
+			Cast<AMouseMouseCharacter>(HolderCharacter))
+		{
+			AttachPoint =
+				PlayerCharacter->GetHoldPoint();
+		}
+
+		// Held by rat
+		else if (AMouseRatCharacter* RatCharacter =
+			Cast<AMouseRatCharacter>(HolderCharacter))
+		{
+			AttachPoint =
+				RatCharacter->GetCarryPoint();
+		}
+
+		if (AttachPoint)
 		{
 			AttachToComponent(
-				HoldPoint,
+				AttachPoint,
 				FAttachmentTransformRules::
 				SnapToTargetNotIncludingScale
 			);
