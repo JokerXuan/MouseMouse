@@ -8,6 +8,7 @@
 
 class USceneComponent;
 class AMouseFoodActor;
+class AMouseRatNest;
 
 UCLASS()
 class MOUSEMOUSE_API AMouseRatCharacter : public ACharacter
@@ -29,11 +30,29 @@ public:
 		return CarriedFood;
 	}
 
+	/** Returns the persistent home nest assigned to this rat. */
+	AMouseRatNest* GetHomeNest() const
+	{
+		return HomeNest;
+	}
+
+	/**
+	 * Assigns this rat's home nest.
+	 * Must be executed by the server when changed during play.
+	 */
+	void SetHomeNest(AMouseRatNest* NewHomeNest);
+
 	/**
 	 * Attempts to pick up a food actor.
 	 * Must be executed by the server.
 	 */
 	bool TryPickupFood(AMouseFoodActor* Food);
+
+	/**
+	 * Attempts to deposit the currently carried food in this rat's home nest.
+	 * Must be executed by the server.
+	 */
+	bool TryDepositCarriedFood();
 
 	/** Registers replicated properties */
 	virtual void GetLifetimeReplicatedProps(
@@ -49,6 +68,18 @@ protected:
 		Category = "Components"
 	)
 	TObjectPtr<USceneComponent> CarryPoint;
+
+	/**
+	 * Persistent level-instance relationship for this rat's home.
+	 * If empty, the server AI may assign the closest available nest.
+	 */
+	UPROPERTY(
+		EditInstanceOnly,
+		Replicated,
+		BlueprintReadOnly,
+		Category = "Rat|Home"
+	)
+	TObjectPtr<AMouseRatNest> HomeNest;
 
 	/** Food currently carried by this rat */
 	UPROPERTY(

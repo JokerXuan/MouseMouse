@@ -3,8 +3,10 @@
 #include "Components/SceneComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Items/Food/MouseFoodActor.h"
+#include "MouseMouse.h"
 #include "Net/UnrealNetwork.h"
 #include "Rat/MouseRatAIController.h"
+#include "Rat/MouseRatNest.h"
 
 
 AMouseRatCharacter::AMouseRatCharacter()
@@ -43,6 +45,31 @@ void AMouseRatCharacter::GetLifetimeReplicatedProps(
 		AMouseRatCharacter,
 		CarriedFood
 	);
+
+	DOREPLIFETIME(
+		AMouseRatCharacter,
+		HomeNest
+	);
+}
+
+
+void AMouseRatCharacter::SetHomeNest(
+	AMouseRatNest* NewHomeNest
+)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (HomeNest == NewHomeNest)
+	{
+		return;
+	}
+
+	HomeNest = NewHomeNest;
+
+	ForceNetUpdate();
 }
 
 
@@ -82,6 +109,81 @@ bool AMouseRatCharacter::TryPickupFood(
 
 	ForceNetUpdate();
 	Food->ForceNetUpdate();
+
+	UE_LOG(
+		LogMouseMouse,
+		Log,
+		TEXT("Rat '%s' picked up food '%s'."),
+		*GetNameSafe(this),
+		*GetNameSafe(Food)
+	);
+
+	return true;
+}
+
+
+bool AMouseRatCharacter::TryDepositCarriedFood()
+{
+	if (!HasAuthority())
+	{
+		return false;
+	}
+
+	AMouseFoodActor* FoodToDeposit = CarriedFood;
+
+	if (!IsValid(FoodToDeposit))
+	{
+		if (CarriedFood)
+		{
+			CarriedFood = nullptr;
+			ForceNetUpdate();
+		}
+
+		return false;
+	}
+
+	// A stale carry reference must not let this rat deposit somebody else's food.
+	if (FoodToDeposit->GetHolder() != this)
+	{
+		CarriedFood = nullptr;
+		ForceNetUpdate();
+
+		UE_LOG(
+			LogMouseMouse,
+			Warning,
+			TEXT("Rat '%s' cleared an invalid carried-food reference '%s'."),
+			*GetNameSafe(this),
+			*GetNameSafe(FoodToDeposit)
+		);
+
+		return false;
+	}
+
+	if (!IsValid(HomeNest))
+	{
+		return false;
+	}
+
+	const float DistanceSquared =
+		FVector::DistSquared(
+			GetActorLocation(),
+			HomeNest->GetDepositLocation()
+		);
+
+	if (DistanceSquared >
+		FMath::Square(AMouseRatNest::DepositDistance))
+	{
+		return false;
+	}
+
+	if (!HomeNest->TryStoreFood(this, FoodToDeposit))
+	{
+		return false;
+	}
+
+	CarriedFood = nullptr;
+
+	ForceNetUpdate();
 
 	return true;
 }

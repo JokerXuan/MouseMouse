@@ -47,7 +47,7 @@ AMouseMouseCharacter::AMouseMouseCharacter()
 	// Create the point where held objects will be attached
 	HoldPoint = CreateDefaultSubobject<USceneComponent>(TEXT("Hold Point"));
 	HoldPoint->SetupAttachment(FirstPersonCameraComponent);
-	HoldPoint->SetRelativeLocation(FVector(100.0f, 0.0f, -20.0f));
+	HoldPoint->SetRelativeLocation(FVector(80.0f, 0.0f, -20.0f));
 
 	// configure the character comps
 	GetMesh()->SetOwnerNoSee(true);
