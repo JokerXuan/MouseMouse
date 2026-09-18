@@ -7,9 +7,8 @@
 #include "MouseRatAIController.generated.h"
 
 class AMouseFoodActor;
-/**
- * 
- */
+class AMouseRatCharacter;
+
 UCLASS()
 class MOUSEMOUSE_API AMouseRatAIController : public AAIController
 {
@@ -20,11 +19,31 @@ public:
 
 protected:
 	virtual void OnPossess(APawn* InPawn) override;
+	virtual void OnUnPossess() override;
 
 private:
-	void SearchForFood();
+	/**
+	 * Periodically updates the rat's current food behavior.
+	 *
+	 * It does not always choose a new target.
+	 * If a valid target already exists, the rat keeps pursuing it.
+	 */
+	void UpdateFoodBehavior();
 
+	/** Finds the nearest food currently available to rats */
 	AMouseFoodActor* FindClosestAvailableFood() const;
 
-	FTimerHandle FoodSearchTimerHandle;
+	/** Starts pursuing a new food target */
+	void SetFoodTarget(AMouseFoodActor* NewTarget);
+
+	/**
+	 * Current food this rat intends to acquire.
+	 *
+	 * This is server-side AI decision state.
+	 * It does NOT need replication.
+	 */
+	UPROPERTY()
+	TObjectPtr<AMouseFoodActor> CurrentFoodTarget;
+
+	FTimerHandle FoodBehaviorTimerHandle;
 };

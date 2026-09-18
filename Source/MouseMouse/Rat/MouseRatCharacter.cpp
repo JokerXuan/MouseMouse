@@ -1,17 +1,14 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+﻿#include "Rat/MouseRatCharacter.h"
 
-
-#include "Rat/MouseRatCharacter.h"
-
-#include "GameFramework/CharacterMovementComponent.h"
 #include "Components/SceneComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "Items/Food/MouseFoodActor.h"
+#include "Net/UnrealNetwork.h"
 #include "Rat/MouseRatAIController.h"
 
 
-// Sets default values
 AMouseRatCharacter::AMouseRatCharacter()
 {
- 	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = false;
 
 	bReplicates = true;
@@ -33,5 +30,58 @@ AMouseRatCharacter::AMouseRatCharacter()
 		EAutoPossessAI::PlacedInWorldOrSpawned;
 
 	GetCharacterMovement()->MaxWalkSpeed = 250.0f;
+}
 
+
+void AMouseRatCharacter::GetLifetimeReplicatedProps(
+	TArray<FLifetimeProperty>& OutLifetimeProps
+) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(
+		AMouseRatCharacter,
+		CarriedFood
+	);
+}
+
+
+bool AMouseRatCharacter::TryPickupFood(
+	AMouseFoodActor* Food
+)
+{
+	if (!HasAuthority())
+	{
+		return false;
+	}
+
+	if (!IsValid(Food))
+	{
+		return false;
+	}
+
+	if (IsValid(CarriedFood))
+	{
+		return false;
+	}
+
+	if (!CarryPoint)
+	{
+		return false;
+	}
+
+	if (!Food->IsAvailableForRat())
+	{
+		return false;
+	}
+
+	CarriedFood = Food;
+
+	Food->SetOwner(this);
+	Food->SetHolder(this);
+
+	ForceNetUpdate();
+	Food->ForceNetUpdate();
+
+	return true;
 }

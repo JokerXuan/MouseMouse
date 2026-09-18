@@ -1,12 +1,10 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
-
-#include "Rat/MouseRatAIController.h"
+﻿#include "Rat/MouseRatAIController.h"
 
 #include "Items/Food/MouseFoodActor.h"
 #include "Kismet/GameplayStatics.h"
+#include "Rat/MouseRatCharacter.h"
 #include "TimerManager.h"
-
+#include "Navigation/PathFollowingComponent.h"
 
 AMouseRatAIController::AMouseRatAIController()
 {
@@ -18,26 +16,35 @@ void AMouseRatAIController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
 
-	// AI decisions should only be made by the server.
 	if (!HasAuthority())
 	{
 		return;
 	}
 
-	// Let the rat make its first decision immediately.
-	SearchForFood();
-
-	// Then re-evaluate periodically.
 	GetWorldTimerManager().SetTimer(
-		FoodSearchTimerHandle,
+		FoodBehaviorTimerHandle,
 		this,
-		&AMouseRatAIController::SearchForFood,
-		1.0f,
+		&AMouseRatAIController::UpdateFoodBehavior,
+		0.25f,
 		true
 	);
 }
 
-AMouseFoodActor* AMouseRatAIController::FindClosestAvailableFood() const
+
+void AMouseRatAIController::OnUnPossess()
+{
+	GetWorldTimerManager().ClearTimer(
+		FoodBehaviorTimerHandle
+	);
+
+	CurrentFoodTarget = nullptr;
+
+	Super::OnUnPossess();
+}
+
+
+AMouseFoodActor*
+AMouseRatAIController::FindClosestAvailableFood() const
 {
 	const APawn* ControlledPawn = GetPawn();
 
@@ -87,9 +94,12 @@ AMouseFoodActor* AMouseRatAIController::FindClosestAvailableFood() const
 				Food->GetActorLocation()
 			);
 
-		if (DistanceSquared < ClosestDistanceSquared)
+		if (DistanceSquared <
+			ClosestDistanceSquared)
 		{
-			ClosestDistanceSquared = DistanceSquared;
+			ClosestDistanceSquared =
+				DistanceSquared;
+
 			ClosestFood = Food;
 		}
 	}
@@ -97,27 +107,96 @@ AMouseFoodActor* AMouseRatAIController::FindClosestAvailableFood() const
 	return ClosestFood;
 }
 
-void AMouseRatAIController::SearchForFood()
+
+void AMouseRatAIController::SetFoodTarget(
+	AMouseFoodActor* NewTarget
+)
+{
+	CurrentFoodTarget = NewTarget;
+
+	if (!IsValid(CurrentFoodTarget))
+	{
+		StopMovement();
+		return;
+	}
+
+	const EPathFollowingRequestResult::Type MoveResult =
+		MoveToActor(
+			CurrentFoodTarget,
+			80.0f,
+			true,
+			true,
+			true
+		);
+
+	if (MoveResult ==
+		EPathFollowingRequestResult::Failed)
+	{
+		CurrentFoodTarget = nullptr;
+	}
+}
+
+
+void AMouseRatAIController::UpdateFoodBehavior()
 {
 	if (!HasAuthority())
 	{
 		return;
 	}
 
-	AMouseFoodActor* Food =
-		FindClosestAvailableFood();
+	AMouseRatCharacter* Rat =
+		Cast<AMouseRatCharacter>(GetPawn());
 
-	if (!Food)
+	if (!Rat)
 	{
-		StopMovement();
 		return;
 	}
 
-	MoveToActor(
-		Food,
-		80.0f,
-		true,
-		true,
-		true
-	);
+	// This vertical slice only supports one carried food.
+	if (IsValid(Rat->GetCarriedFood()))
+	{
+		CurrentFoodTarget = nullptr;
+
+		StopMovement();
+
+		return;
+	}
+
+	// Acquire a new target only when the current
+	// decision is no longer usable.
+	if (!IsValid(CurrentFoodTarget) ||
+		!CurrentFoodTarget->IsAvailableForRat())
+	{
+		SetFoodTarget(
+			FindClosestAvailableFood()
+		);
+
+		if (!IsValid(CurrentFoodTarget))
+		{
+			return;
+		}
+	}
+
+	const float DistanceSquared =
+		FVector::DistSquared(
+			Rat->GetActorLocation(),
+			CurrentFoodTarget->GetActorLocation()
+		);
+
+	constexpr float PickupDistance = 100.0f;
+
+	if (DistanceSquared <=
+		FMath::Square(PickupDistance))
+	{
+		StopMovement();
+
+		AMouseFoodActor* FoodToPickup =
+			CurrentFoodTarget;
+
+		Rat->TryPickupFood(FoodToPickup);
+
+		CurrentFoodTarget = nullptr;
+
+		return;
+	}
 }
