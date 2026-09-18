@@ -334,7 +334,7 @@ bool AMouseRatAIController::RequestMoveToHome(
 		MoveToLocation(
 			HomeNest->GetDepositLocation(),
 			HomeMoveAcceptanceRadius,
-			true,
+			false,
 			true,
 			true,
 			true,
