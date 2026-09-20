@@ -19,6 +19,12 @@ public:
 	// Sets default values for this character's properties
 	AMouseRatCharacter();
 
+	/**
+	 * Extra distance allowed between this rat's capsule surface and a food
+	 * actor's bounds when picking it up.
+	 */
+	static constexpr float PickupReach = 100.0f;
+
 	USceneComponent* GetCarryPoint() const
 	{
 		return CarryPoint;
@@ -41,6 +47,23 @@ public:
 	 * Must be executed by the server when changed during play.
 	 */
 	void SetHomeNest(AMouseRatNest* NewHomeNest);
+
+	/**
+	 * Returns whether the rat's collision capsule is within ExtraReach of a
+	 * world-space point. ExtraReach is measured from the capsule surface.
+	 */
+	bool IsWithinReachOfPoint(
+		const FVector& Point,
+		float ExtraReach
+	) const;
+
+	/**
+	 * Returns whether the rat's collision capsule is within PickupReach of
+	 * the food actor's collision bounds.
+	 */
+	bool IsFoodWithinPickupRange(
+		const AMouseFoodActor* Food
+	) const;
 
 	/**
 	 * Attempts to pick up a food actor.
@@ -89,4 +112,16 @@ protected:
 		Category = "Rat|Carry"
 	)
 	TObjectPtr<AMouseFoodActor> CarriedFood;
+
+private:
+
+	/**
+	 * Returns whether the rat capsule is within ExtraReach of the supplied
+	 * axis-aligned world bounds.
+	 */
+	bool IsWithinReachOfBounds(
+		const FVector& BoundsOrigin,
+		const FVector& BoundsExtent,
+		float ExtraReach
+	) const;
 };

@@ -73,13 +73,10 @@ bool AMouseRatNest::TryStoreFood(
 		return false;
 	}
 
-	const float DistanceSquared =
-		FVector::DistSquared(
-			DepositingRat->GetActorLocation(),
-			GetDepositLocation()
-		);
-
-	if (DistanceSquared > FMath::Square(DepositDistance))
+	if (!DepositingRat->IsWithinReachOfPoint(
+		GetDepositLocation(),
+		DepositDistance
+	))
 	{
 		return false;
 	}

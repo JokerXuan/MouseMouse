@@ -116,7 +116,4 @@ private:
 	static constexpr float FoodSearchRetryInterval = 1.0f;
 	static constexpr float HomeNestSearchRetryInterval = 2.0f;
 	static constexpr float MoveRetryInterval = 1.0f;
-	static constexpr float PickupDistance = 100.0f;
-	static constexpr float FoodMoveAcceptanceRadius = 80.0f;
-	static constexpr float HomeMoveAcceptanceRadius = 80.0f;
 };

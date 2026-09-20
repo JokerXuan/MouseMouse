@@ -21,7 +21,9 @@ class MOUSEMOUSE_API AMouseRatNest : public AActor
 public:
 	AMouseRatNest();
 
-	/** Shared gameplay range used for authoritative deposit validation. */
+	/**
+	 * Extra distance allowed between the rat capsule surface and DepositPoint.
+	 */
 	static constexpr float DepositDistance = 100.0f;
 
 	/** Gameplay point rats navigate to before depositing food. */

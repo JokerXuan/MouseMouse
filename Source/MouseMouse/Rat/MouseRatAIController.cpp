@@ -288,11 +288,13 @@ bool AMouseRatAIController::RequestMoveToFood(
 		return false;
 	}
 
+	// Keep navigation's 2D reach test conservative. Adding overlap radii can
+	// report arrival before the 3D capsule-to-food gameplay reach is valid.
 	const EPathFollowingRequestResult::Type MoveResult =
 		MoveToActor(
 			Food,
-			FoodMoveAcceptanceRadius,
-			true,
+			AMouseRatCharacter::PickupReach,
+			false,
 			true,
 			true
 		);
@@ -330,10 +332,12 @@ bool AMouseRatAIController::RequestMoveToHome(
 		return false;
 	}
 
+	// Deposit uses the same conservative rule as food so a completed path is
+	// always close enough for the authoritative 3D capsule reach check.
 	const EPathFollowingRequestResult::Type MoveResult =
 		MoveToLocation(
 			HomeNest->GetDepositLocation(),
-			HomeMoveAcceptanceRadius,
+			AMouseRatNest::DepositDistance,
 			false,
 			true,
 			true,
@@ -491,13 +495,7 @@ void AMouseRatAIController::UpdateMovingToFood(
 		return;
 	}
 
-	const float DistanceSquared =
-		FVector::DistSquared(
-			Rat->GetActorLocation(),
-			CurrentFoodTarget->GetActorLocation()
-		);
-
-	if (DistanceSquared <= FMath::Square(PickupDistance))
+	if (Rat->IsFoodWithinPickupRange(CurrentFoodTarget))
 	{
 		AMouseFoodActor* FoodToPickup =
 			CurrentFoodTarget;
@@ -582,14 +580,10 @@ void AMouseRatAIController::UpdateReturningHome(
 		return;
 	}
 
-	const float DistanceSquared =
-		FVector::DistSquared(
-			Rat->GetActorLocation(),
-			HomeNest->GetDepositLocation()
-		);
-
-	if (DistanceSquared <=
-		FMath::Square(AMouseRatNest::DepositDistance))
+	if (Rat->IsWithinReachOfPoint(
+		HomeNest->GetDepositLocation(),
+		AMouseRatNest::DepositDistance
+	))
 	{
 		StopMovement();
 

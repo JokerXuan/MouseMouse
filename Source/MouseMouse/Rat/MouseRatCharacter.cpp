@@ -1,6 +1,8 @@
 ﻿#include "Rat/MouseRatCharacter.h"
 
+#include "Components/CapsuleComponent.h"
 #include "Components/SceneComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Items/Food/MouseFoodActor.h"
 #include "MouseMouse.h"
@@ -9,17 +11,171 @@
 #include "Rat/MouseRatNest.h"
 
 
+namespace
+{
+float GetSquaredDistanceFromPointToBounds(
+	const FVector& Point,
+	const FVector& BoundsMin,
+	const FVector& BoundsMax
+)
+{
+	const FVector ClosestPoint(
+		FMath::Clamp(Point.X, BoundsMin.X, BoundsMax.X),
+		FMath::Clamp(Point.Y, BoundsMin.Y, BoundsMax.Y),
+		FMath::Clamp(Point.Z, BoundsMin.Z, BoundsMax.Z)
+	);
+
+	return FVector::DistSquared(Point, ClosestPoint);
+}
+
+
+float GetSquaredDistanceFromSegmentToBounds(
+	const FVector& SegmentStart,
+	const FVector& SegmentEnd,
+	const FVector& BoundsMin,
+	const FVector& BoundsMax
+)
+{
+	const FVector Direction = SegmentEnd - SegmentStart;
+
+	// The closest point on an axis-aligned box changes only where the segment
+	// crosses one of its planes. Within each resulting interval, the squared
+	// distance is a simple quadratic with at most one interior minimum.
+	TArray<float, TInlineAllocator<8>> IntervalBounds;
+	IntervalBounds.Reserve(8);
+	IntervalBounds.Add(0.0f);
+	IntervalBounds.Add(1.0f);
+
+	for (int32 AxisIndex = 0; AxisIndex < 3; ++AxisIndex)
+	{
+		const float DirectionComponent = Direction[AxisIndex];
+
+		if (FMath::IsNearlyZero(DirectionComponent))
+		{
+			continue;
+		}
+
+		const float MinPlaneTime =
+			(BoundsMin[AxisIndex] - SegmentStart[AxisIndex]) /
+			DirectionComponent;
+
+		const float MaxPlaneTime =
+			(BoundsMax[AxisIndex] - SegmentStart[AxisIndex]) /
+			DirectionComponent;
+
+		if (MinPlaneTime > 0.0f &&
+			MinPlaneTime < 1.0f)
+		{
+			IntervalBounds.Add(MinPlaneTime);
+		}
+
+		if (MaxPlaneTime > 0.0f &&
+			MaxPlaneTime < 1.0f)
+		{
+			IntervalBounds.Add(MaxPlaneTime);
+		}
+	}
+
+	IntervalBounds.Sort();
+
+	float SquaredDistance = TNumericLimits<float>::Max();
+
+	for (const float Time : IntervalBounds)
+	{
+		SquaredDistance = FMath::Min(
+			SquaredDistance,
+			GetSquaredDistanceFromPointToBounds(
+				SegmentStart + Direction * Time,
+				BoundsMin,
+				BoundsMax
+			)
+		);
+	}
+
+	for (int32 IntervalIndex = 0;
+		IntervalIndex < IntervalBounds.Num() - 1;
+		++IntervalIndex)
+	{
+		const float IntervalStart = IntervalBounds[IntervalIndex];
+		const float IntervalEnd = IntervalBounds[IntervalIndex + 1];
+
+		if (FMath::IsNearlyEqual(IntervalStart, IntervalEnd))
+		{
+			continue;
+		}
+
+		const FVector MidPoint = SegmentStart +
+			Direction * ((IntervalStart + IntervalEnd) * 0.5f);
+
+		float QuadraticLinearTerm = 0.0f;
+		float QuadraticSquaredTerm = 0.0f;
+
+		for (int32 AxisIndex = 0; AxisIndex < 3; ++AxisIndex)
+		{
+			float NearestBound = 0.0f;
+
+			if (MidPoint[AxisIndex] < BoundsMin[AxisIndex])
+			{
+				NearestBound = BoundsMin[AxisIndex];
+			}
+			else if (MidPoint[AxisIndex] > BoundsMax[AxisIndex])
+			{
+				NearestBound = BoundsMax[AxisIndex];
+			}
+			else
+			{
+				continue;
+			}
+
+			const float DirectionComponent = Direction[AxisIndex];
+			const float Offset =
+				SegmentStart[AxisIndex] - NearestBound;
+
+			QuadraticLinearTerm += DirectionComponent * Offset;
+			QuadraticSquaredTerm +=
+				DirectionComponent * DirectionComponent;
+		}
+
+		if (QuadraticSquaredTerm <= SMALL_NUMBER)
+		{
+			continue;
+		}
+
+		const float NearestTime = FMath::Clamp(
+			-QuadraticLinearTerm / QuadraticSquaredTerm,
+			IntervalStart,
+			IntervalEnd
+		);
+
+		SquaredDistance = FMath::Min(
+			SquaredDistance,
+			GetSquaredDistanceFromPointToBounds(
+				SegmentStart + Direction * NearestTime,
+				BoundsMin,
+				BoundsMax
+			)
+		);
+	}
+
+	return SquaredDistance;
+}
+}
+
+
 AMouseRatCharacter::AMouseRatCharacter()
 {
 	PrimaryActorTick.bCanEverTick = false;
 
 	bReplicates = true;
+	bUseControllerRotationYaw = false;
 
 	CarryPoint = CreateDefaultSubobject<USceneComponent>(
 		TEXT("Carry Point")
 	);
 
-	CarryPoint->SetupAttachment(GetRootComponent());
+	// The visual mesh remains aligned to the rat body when its capsule is
+	// resized in Blueprint, unlike the capsule-center root component.
+	CarryPoint->SetupAttachment(GetMesh());
 
 	CarryPoint->SetRelativeLocation(
 		FVector(15.0f, 0.0f, 0.0f)
@@ -31,7 +187,13 @@ AMouseRatCharacter::AMouseRatCharacter()
 	AutoPossessAI =
 		EAutoPossessAI::PlacedInWorldOrSpawned;
 
-	GetCharacterMovement()->MaxWalkSpeed = 250.0f;
+	UCharacterMovementComponent* MovementComponent =
+		GetCharacterMovement();
+
+	MovementComponent->bOrientRotationToMovement = true;
+	MovementComponent->bUseControllerDesiredRotation = false;
+	MovementComponent->RotationRate = FRotator(0.0f, 540.0f, 0.0f);
+	MovementComponent->MaxWalkSpeed = 250.0f;
 }
 
 
@@ -73,6 +235,107 @@ void AMouseRatCharacter::SetHomeNest(
 }
 
 
+bool AMouseRatCharacter::IsWithinReachOfPoint(
+	const FVector& Point,
+	float ExtraReach
+) const
+{
+	return IsWithinReachOfBounds(
+		Point,
+		FVector::ZeroVector,
+		ExtraReach
+	);
+}
+
+
+bool AMouseRatCharacter::IsFoodWithinPickupRange(
+	const AMouseFoodActor* Food
+) const
+{
+	if (!IsValid(Food))
+	{
+		return false;
+	}
+
+	FVector FoodBoundsOrigin;
+	FVector FoodBoundsExtent;
+
+	Food->GetActorBounds(
+		true,
+		FoodBoundsOrigin,
+		FoodBoundsExtent,
+		false
+	);
+
+	// Food meshes may be configured without collision. Their visual bounds are
+	// still the best available representation of the food's physical extent.
+	if (FoodBoundsExtent.IsNearlyZero())
+	{
+		Food->GetActorBounds(
+			false,
+			FoodBoundsOrigin,
+			FoodBoundsExtent,
+			false
+		);
+	}
+
+	return IsWithinReachOfBounds(
+		FoodBoundsOrigin,
+		FoodBoundsExtent,
+		PickupReach
+	);
+}
+
+
+bool AMouseRatCharacter::IsWithinReachOfBounds(
+	const FVector& BoundsOrigin,
+	const FVector& BoundsExtent,
+	float ExtraReach
+) const
+{
+	const UCapsuleComponent* Capsule = GetCapsuleComponent();
+
+	const FVector CapsuleCenter = Capsule
+		? Capsule->GetComponentLocation()
+		: GetActorLocation();
+
+	const FVector CapsuleAxis = Capsule
+		? Capsule->GetUpVector()
+		: FVector::UpVector;
+
+	const float CapsuleRadius = Capsule
+		? Capsule->GetScaledCapsuleRadius()
+		: 0.0f;
+
+	const float CapsuleHalfHeight = Capsule
+		? Capsule->GetScaledCapsuleHalfHeight()
+		: 0.0f;
+
+	const float CapsuleSegmentHalfLength = FMath::Max(
+		0.0f,
+		CapsuleHalfHeight - CapsuleRadius
+	);
+
+	const FVector SafeBoundsExtent(
+		FMath::Max(0.0f, BoundsExtent.X),
+		FMath::Max(0.0f, BoundsExtent.Y),
+		FMath::Max(0.0f, BoundsExtent.Z)
+	);
+
+	const FVector BoundsMin = BoundsOrigin - SafeBoundsExtent;
+	const FVector BoundsMax = BoundsOrigin + SafeBoundsExtent;
+	const float TotalReach =
+		CapsuleRadius + FMath::Max(0.0f, ExtraReach);
+
+	return GetSquaredDistanceFromSegmentToBounds(
+		CapsuleCenter - CapsuleAxis * CapsuleSegmentHalfLength,
+		CapsuleCenter + CapsuleAxis * CapsuleSegmentHalfLength,
+		BoundsMin,
+		BoundsMax
+	) <= FMath::Square(TotalReach);
+}
+
+
 bool AMouseRatCharacter::TryPickupFood(
 	AMouseFoodActor* Food
 )
@@ -98,6 +361,11 @@ bool AMouseRatCharacter::TryPickupFood(
 	}
 
 	if (!Food->IsAvailableForRat())
+	{
+		return false;
+	}
+
+	if (!IsFoodWithinPickupRange(Food))
 	{
 		return false;
 	}
@@ -164,14 +432,10 @@ bool AMouseRatCharacter::TryDepositCarriedFood()
 		return false;
 	}
 
-	const float DistanceSquared =
-		FVector::DistSquared(
-			GetActorLocation(),
-			HomeNest->GetDepositLocation()
-		);
-
-	if (DistanceSquared >
-		FMath::Square(AMouseRatNest::DepositDistance))
+	if (!IsWithinReachOfPoint(
+		HomeNest->GetDepositLocation(),
+		AMouseRatNest::DepositDistance
+	))
 	{
 		return false;
 	}
