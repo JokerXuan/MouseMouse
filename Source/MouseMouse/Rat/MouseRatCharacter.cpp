@@ -1,10 +1,13 @@
 ﻿#include "Rat/MouseRatCharacter.h"
 
+#include "AIController.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Items/Food/MouseFoodActor.h"
+#include "Items/RatCard/MouseRatCardActor.h"
 #include "MouseMouse.h"
 #include "Net/UnrealNetwork.h"
 #include "Rat/MouseRatAIController.h"
@@ -448,6 +451,72 @@ bool AMouseRatCharacter::TryDepositCarriedFood()
 	CarriedFood = nullptr;
 
 	ForceNetUpdate();
+
+	return true;
+}
+
+
+bool AMouseRatCharacter::TryCapture()
+{
+	if (!HasAuthority() ||
+		bCaptureInProgress ||
+		!RatCardClass)
+	{
+		return false;
+	}
+
+	UWorld* World = GetWorld();
+
+	if (!World)
+	{
+		return false;
+	}
+
+	bCaptureInProgress = true;
+
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.SpawnCollisionHandlingOverride =
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	AMouseRatCardActor* RatCard =
+		World->SpawnActor<AMouseRatCardActor>(
+			RatCardClass,
+			GetActorTransform(),
+			SpawnParameters
+		);
+
+	if (!IsValid(RatCard))
+	{
+		bCaptureInProgress = false;
+
+		return false;
+	}
+
+	// A newly spawned pickup must enter the same unheld, dropped state used by
+	// the existing food and generic pickup actors.
+	RatCard->SetOwner(nullptr);
+	RatCard->SetHolder(nullptr);
+	RatCard->ForceNetUpdate();
+
+	AMouseFoodActor* FoodToDrop = CarriedFood;
+
+	if (IsValid(FoodToDrop))
+	{
+		FoodToDrop->SetOwner(nullptr);
+		FoodToDrop->SetHolder(nullptr);
+		FoodToDrop->ForceNetUpdate();
+	}
+
+	CarriedFood = nullptr;
+	ForceNetUpdate();
+
+	if (AAIController* AIController =
+		Cast<AAIController>(GetController()))
+	{
+		AIController->StopMovement();
+	}
+
+	Destroy();
 
 	return true;
 }

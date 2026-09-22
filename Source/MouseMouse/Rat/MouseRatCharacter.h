@@ -8,6 +8,7 @@
 
 class USceneComponent;
 class AMouseFoodActor;
+class AMouseRatCardActor;
 class AMouseRatNest;
 
 UCLASS()
@@ -101,6 +102,12 @@ public:
 	 */
 	bool TryDepositCarriedFood();
 
+	/**
+	 * Converts this rat into its configured world pickup card.
+	 * This is a server-only, one-way gameplay operation.
+	 */
+	bool TryCapture();
+
 	/** Registers replicated properties */
 	virtual void GetLifetimeReplicatedProps(
 		TArray<FLifetimeProperty>& OutLifetimeProps
@@ -136,6 +143,14 @@ protected:
 		Category = "Rat|Carry"
 	)
 	TObjectPtr<AMouseFoodActor> CarriedFood;
+
+	/** Pickup class spawned at this rat's location after a successful capture. */
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Rat|Capture"
+	)
+	TSubclassOf<AMouseRatCardActor> RatCardClass;
 
 	/** Radius within which the server first detects a player as a threat. */
 	UPROPERTY(
@@ -187,4 +202,7 @@ private:
 		const FVector& BoundsExtent,
 		float ExtraReach
 	) const;
+
+	/** Prevents overlapping capture areas from converting one rat more than once. */
+	bool bCaptureInProgress = false;
 };
