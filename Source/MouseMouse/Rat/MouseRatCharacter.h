@@ -42,6 +42,30 @@ public:
 		return HomeNest;
 	}
 
+	/** Radius within which a player first becomes a threat to this rat. */
+	float GetThreatDetectionRadius() const
+	{
+		return ThreatDetectionRadius;
+	}
+
+	/** Radius a detected threat must leave before the rat can become safe. */
+	float GetLoseThreatRadius() const
+	{
+		return LoseThreatRadius;
+	}
+
+	/** Time the rat must remain safe before it resumes its food behavior. */
+	float GetSafeTimeBeforeResume() const
+	{
+		return SafeTimeBeforeResume;
+	}
+
+	/** Desired horizontal distance from the threat for each flee destination. */
+	float GetFleeDistance() const
+	{
+		return FleeDistance;
+	}
+
 	/**
 	 * Assigns this rat's home nest.
 	 * Must be executed by the server when changed during play.
@@ -112,6 +136,45 @@ protected:
 		Category = "Rat|Carry"
 	)
 	TObjectPtr<AMouseFoodActor> CarriedFood;
+
+	/** Radius within which the server first detects a player as a threat. */
+	UPROPERTY(
+		EditAnywhere,
+		BlueprintReadOnly,
+		Category = "Rat|Threat",
+		meta = (ClampMin = "0.0", UIMin = "0.0")
+	)
+	float ThreatDetectionRadius = 800.0f;
+
+	/**
+	 * Radius a detected player must leave before the rat begins its safe timer.
+	 * Configure this greater than ThreatDetectionRadius to avoid boundary churn.
+	 */
+	UPROPERTY(
+		EditAnywhere,
+		BlueprintReadOnly,
+		Category = "Rat|Threat",
+		meta = (ClampMin = "0.0", UIMin = "0.0")
+	)
+	float LoseThreatRadius = 1100.0f;
+
+	/** Consecutive safe time required before leaving the Fleeing state. */
+	UPROPERTY(
+		EditAnywhere,
+		BlueprintReadOnly,
+		Category = "Rat|Threat",
+		meta = (ClampMin = "0.0", UIMin = "0.0")
+	)
+	float SafeTimeBeforeResume = 2.0f;
+
+	/** Distance used when generating navigable flee targets away from a threat. */
+	UPROPERTY(
+		EditAnywhere,
+		BlueprintReadOnly,
+		Category = "Rat|Threat",
+		meta = (ClampMin = "0.0", UIMin = "0.0")
+	)
+	float FleeDistance = 800.0f;
 
 private:
 

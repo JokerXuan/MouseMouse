@@ -21,7 +21,9 @@ public class MouseMouse : ModuleRules
 			"Slate"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { });
+		PrivateDependencyModuleNames.AddRange(new string[] {
+			"NavigationSystem"
+		});
 
 		PublicIncludePaths.AddRange(new string[] {
 			"MouseMouse",

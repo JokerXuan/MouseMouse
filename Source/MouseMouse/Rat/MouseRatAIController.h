@@ -7,15 +7,17 @@
 #include "MouseRatAIController.generated.h"
 
 class AMouseFoodActor;
+class AMouseMouseCharacter;
 class AMouseRatCharacter;
 class AMouseRatNest;
 
-/** Server-only decision state for the rat's food loop. */
+/** Server-only decision state for the rat's food and threat behavior. */
 enum class ERatFoodBehaviorState : uint8
 {
 	SeekingFood,
 	MovingToFood,
-	ReturningHome
+	ReturningHome,
+	Fleeing
 };
 
 UCLASS()
@@ -35,6 +37,42 @@ private:
 	 * Periodically updates the rat's current food behavior.
 	 */
 	void UpdateFoodBehavior();
+
+	/** Updates server-only threat tracking and returns whether fleeing has priority. */
+	bool UpdateThreatDetection(AMouseRatCharacter* Rat);
+
+	/** Finds the nearest player-controlled MouseMouse character within SearchRadius. */
+	AMouseMouseCharacter* FindClosestValidPlayerCharacter(
+		float SearchRadius
+	) const;
+
+	/** Returns a loss radius that remains larger than the detection radius. */
+	float GetEffectiveLoseThreatRadius(
+		const AMouseRatCharacter* Rat
+	) const;
+
+	/** Stops the current task and switches the rat into server-only fleeing. */
+	void EnterFleeing();
+
+	/** Continues movement away from the current threat while fleeing. */
+	void UpdateFleeing(AMouseRatCharacter* Rat);
+
+	/** Re-evaluates normal behavior from current carried-food state after fleeing. */
+	void ResumeFromFleeing(AMouseRatCharacter* Rat);
+
+	/** Selects a reachable NavMesh flee point and begins moving to it. */
+	bool SelectAndMoveToFleePoint(AMouseRatCharacter* Rat);
+
+	/** Finds a simple reachable flee point behind or diagonally behind the rat. */
+	bool FindFleePoint(
+		AMouseRatCharacter* Rat,
+		FVector& OutFleePoint
+	) const;
+
+	/** Returns whether the active flee destination still leads away from the threat. */
+	bool DoesCurrentFleePointLeadAwayFromThreat(
+		const AMouseRatCharacter* Rat
+	) const;
 
 	/** Chooses a food target only when this rat needs a new one. */
 	void UpdateSeekingFood(AMouseRatCharacter* Rat);
@@ -63,6 +101,9 @@ private:
 	/** Issues a movement request toward a nest's DepositPoint location. */
 	bool RequestMoveToHome(AMouseRatNest* HomeNest);
 
+	/** Issues a movement request toward a previously projected flee point. */
+	bool RequestMoveToFleePoint(const FVector& FleePoint);
+
 	/** Transitions from carrying food to the return-home behavior. */
 	void StartReturningHome();
 
@@ -85,9 +126,19 @@ private:
 	UPROPERTY()
 	TObjectPtr<AMouseRatNest> CurrentHomeMoveTarget;
 
+	/** Current server-only player threat. This is deliberately not replicated. */
+	UPROPERTY(Transient)
+	TObjectPtr<AMouseMouseCharacter> CurrentThreat;
+
 	/** Server-only behavior state; clients only observe replicated gameplay results. */
 	ERatFoodBehaviorState FoodBehaviorState =
 		ERatFoodBehaviorState::SeekingFood;
+
+	/** Server-only NavMesh location currently used for fleeing. */
+	FVector CurrentFleePoint = FVector::ZeroVector;
+
+	/** Whether CurrentFleePoint contains a valid selected destination. */
+	bool bHasCurrentFleePoint = false;
 
 	FTimerHandle FoodBehaviorTimerHandle;
 
@@ -103,6 +154,15 @@ private:
 	/** Keeps a failed home movement request from retrying every behavior update. */
 	float NextHomeMoveRetryTime = 0.0f;
 
+	/** Time at which the current threat first remained outside the loss radius. */
+	float ThreatSafeStartTime = -1.0f;
+
+	/** Keeps an unreachable flee target from retrying every behavior update. */
+	float NextFleeMoveRetryTime = 0.0f;
+
+	/** Throttles immediate redirects when a player crosses in front of the rat. */
+	float NextFleeThreatRedirectTime = 0.0f;
+
 	/** Suppresses repeated warnings while a map is missing a nest. */
 	bool bHasLoggedMissingHome = false;
 
@@ -112,8 +172,18 @@ private:
 	/** Suppresses repeated warnings for the same immediately-failed home move. */
 	bool bHasLoggedHomeMoveFailure = false;
 
+	/** Suppresses repeated warnings while all current flee destinations fail. */
+	bool bHasLoggedFleeMoveFailure = false;
+
 	static constexpr float BehaviorUpdateInterval = 0.25f;
 	static constexpr float FoodSearchRetryInterval = 1.0f;
 	static constexpr float HomeNestSearchRetryInterval = 2.0f;
 	static constexpr float MoveRetryInterval = 1.0f;
+	static constexpr float FleePointAcceptanceRadius = 75.0f;
+	static constexpr float FleePointReachedDistance = 100.0f;
+	static constexpr float FleeProjectionExtentXY = 300.0f;
+	static constexpr float FleeProjectionExtentZ = 500.0f;
+	static constexpr float FleeThreatRedirectInterval = 0.25f;
+	static constexpr float FleePointAwayDotThreshold = 0.1f;
+	static constexpr float MinimumLoseThreatRadiusDifference = 1.0f;
 };
