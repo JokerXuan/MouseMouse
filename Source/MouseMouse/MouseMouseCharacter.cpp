@@ -140,6 +140,31 @@ bool AMouseMouseCharacter::TryPickupActor(
 	return true;
 }
 
+bool AMouseMouseCharacter::ReleaseHeldPickup(
+	AMousePickupActor* ExpectedPickup
+)
+{
+	if (!HasAuthority() ||
+		!IsValid(ExpectedPickup) ||
+		HeldActor.Get() != ExpectedPickup ||
+		ExpectedPickup->GetHolder() != this)
+	{
+		return false;
+	}
+
+	HeldActor = nullptr;
+
+	// Keep the existing pickup release sequence. The caller decides the final
+	// transform and physics state after this generic holder cleanup.
+	ExpectedPickup->SetOwner(nullptr);
+	ExpectedPickup->SetHolder(nullptr);
+
+	ForceNetUpdate();
+	ExpectedPickup->ForceNetUpdate();
+
+	return true;
+}
+
 bool AMouseMouseCharacter::TryDropHeldActor()
 {
 	if (!HasAuthority())
@@ -209,6 +234,16 @@ void AMouseMouseCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 			EnhancedInputComponent->BindAction(DropAction, ETriggerEvent::Started, this, &AMouseMouseCharacter::DropInput);
 		}
 
+		// Primary use is intentionally item-agnostic. The held pickup owns its
+		// own local preview and any server-authoritative gameplay request.
+		if (PrimaryUseAction)
+		{
+			EnhancedInputComponent->BindAction(PrimaryUseAction, ETriggerEvent::Started, this, &AMouseMouseCharacter::PrimaryUseStartedInput);
+			EnhancedInputComponent->BindAction(PrimaryUseAction, ETriggerEvent::Triggered, this, &AMouseMouseCharacter::PrimaryUseTriggeredInput);
+			EnhancedInputComponent->BindAction(PrimaryUseAction, ETriggerEvent::Completed, this, &AMouseMouseCharacter::PrimaryUseCompletedInput);
+			EnhancedInputComponent->BindAction(PrimaryUseAction, ETriggerEvent::Canceled, this, &AMouseMouseCharacter::PrimaryUseCompletedInput);
+		}
+
 		// Moving
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AMouseMouseCharacter::MoveInput);
 
@@ -276,6 +311,33 @@ void AMouseMouseCharacter::DropInput()
 	else
 	{
 		ServerDropHeldActor();
+	}
+}
+
+void AMouseMouseCharacter::PrimaryUseStartedInput()
+{
+	if (AMousePickupActor* PickupActor =
+		Cast<AMousePickupActor>(HeldActor))
+	{
+		PickupActor->PrimaryUseStarted();
+	}
+}
+
+void AMouseMouseCharacter::PrimaryUseTriggeredInput()
+{
+	if (AMousePickupActor* PickupActor =
+		Cast<AMousePickupActor>(HeldActor))
+	{
+		PickupActor->PrimaryUseTriggered();
+	}
+}
+
+void AMouseMouseCharacter::PrimaryUseCompletedInput()
+{
+	if (AMousePickupActor* PickupActor =
+		Cast<AMousePickupActor>(HeldActor))
+	{
+		PickupActor->PrimaryUseCompleted();
 	}
 }
 

@@ -35,6 +35,14 @@ public:
 		return HolderCharacter;
 	}
 
+	/**
+	 * Local input extension points for an item held by a player. Subclasses own
+	 * any gameplay requests they need to make to the server.
+	 */
+	virtual void PrimaryUseStarted();
+	virtual void PrimaryUseTriggered();
+	virtual void PrimaryUseCompleted();
+
 	virtual void GetLifetimeReplicatedProps(
 		TArray<FLifetimeProperty>& OutLifetimeProps
 	) const override;

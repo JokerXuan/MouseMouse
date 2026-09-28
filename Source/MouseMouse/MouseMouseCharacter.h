@@ -12,6 +12,7 @@ class USkeletalMeshComponent;
 class UCameraComponent;
 class UInputAction;
 class UMouseInteractionComponent;
+class AMousePickupActor;
 struct FInputActionValue;
 class USceneComponent;
 
@@ -59,6 +60,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Input")
 	UInputAction* DropAction;
 
+	/** Primary-use Input Action for the currently held pickup. */
+	UPROPERTY(EditAnywhere, Category = "Input")
+	UInputAction* PrimaryUseAction;
+
 	/** Move Input Action */
 	UPROPERTY(EditAnywhere, Category ="Input")
 	UInputAction* MoveAction;
@@ -87,6 +92,11 @@ protected:
 
 	/** Called when the player presses the drop input */
 	void DropInput();
+
+	/** Forward primary-use input to the currently held pickup. */
+	void PrimaryUseStartedInput();
+	void PrimaryUseTriggeredInput();
+	void PrimaryUseCompletedInput();
 
 	/** Sends an interaction request to the server */
 	UFUNCTION(Server, Reliable)
@@ -146,6 +156,12 @@ public:
 	 * This Gameplay operation must be executed by the server.
 	 **/
 	bool TryPickupActor(AActor* ActorToPickup);
+
+	/**
+	 * Clears this character's authoritative held-pickup state without changing
+	 * the pickup's final world placement. Server-only callers set that placement.
+	 */
+	bool ReleaseHeldPickup(AMousePickupActor* ExpectedPickup);
 
 	/** Registers replicated properties for this character **/
 	virtual void GetLifetimeReplicatedProps(

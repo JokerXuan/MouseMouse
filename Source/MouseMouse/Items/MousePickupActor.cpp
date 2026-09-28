@@ -58,6 +58,18 @@ void AMousePickupActor::SetHolder(
 	ForceNetUpdate();
 }
 
+void AMousePickupActor::PrimaryUseStarted()
+{
+}
+
+void AMousePickupActor::PrimaryUseTriggered()
+{
+}
+
+void AMousePickupActor::PrimaryUseCompleted()
+{
+}
+
 void AMousePickupActor::OnRep_HolderCharacter()
 {
 	ApplyHolderState();
