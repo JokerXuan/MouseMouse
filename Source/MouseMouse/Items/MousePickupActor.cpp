@@ -43,10 +43,17 @@ void AMousePickupActor::SetHolder(
 		return;
 	}
 
+	ACharacter* OldHolder = HolderCharacter;
+
 	HolderCharacter = NewHolder;
 
 	// OnRep normally runs on clients, so the server applies it manually.
 	ApplyHolderState();
+
+	OnHolderChanged(
+		OldHolder,
+		NewHolder
+	);
 
 	ForceNetUpdate();
 }
@@ -112,6 +119,13 @@ void AMousePickupActor::ApplyHolderState()
 		Mesh->SetSimulatePhysics(true);
 		Mesh->WakeAllRigidBodies();
 	}
+}
+
+void AMousePickupActor::OnHolderChanged(
+	ACharacter* /*OldHolder*/,
+	ACharacter* /*NewHolder*/
+)
+{
 }
 
 void AMousePickupActor::Interact_Implementation(

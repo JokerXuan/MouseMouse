@@ -60,4 +60,13 @@ protected:
 	 * based on HolderCharacter.
 	 */
 	void ApplyHolderState();
+
+	/**
+	 * Server-only extension point for pickup subclasses that need to react to
+	 * their holder changing. The base pickup behavior remains unchanged.
+	 */
+	virtual void OnHolderChanged(
+		ACharacter* OldHolder,
+		ACharacter* NewHolder
+	);
 };
