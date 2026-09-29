@@ -479,10 +479,12 @@ bool AMouseRatCharacter::TryCapture()
 	SpawnParameters.SpawnCollisionHandlingOverride =
 		ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
+	// Spawn without a source scale so RatCardClass keeps its configured size.
 	AMouseRatCardActor* RatCard =
 		World->SpawnActor<AMouseRatCardActor>(
 			RatCardClass,
-			GetActorTransform(),
+			GetActorLocation(),
+			GetActorRotation(),
 			SpawnParameters
 		);
 
