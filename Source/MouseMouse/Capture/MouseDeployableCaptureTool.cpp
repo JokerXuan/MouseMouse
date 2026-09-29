@@ -19,12 +19,12 @@ constexpr float DeploymentGroundClearance = 2.0f;
 constexpr float DeploymentRequestTolerance = 100.0f;
 constexpr float MinimumPlacementExtent = 5.0f;
 
-FVector GetAbsoluteScale(const FVector& First, const FVector& Second)
+FVector GetAbsoluteScale(const FVector& Scale)
 {
 	return FVector(
-		FMath::Abs(First.X * Second.X),
-		FMath::Abs(First.Y * Second.Y),
-		FMath::Abs(First.Z * Second.Z)
+		FMath::Abs(Scale.X),
+		FMath::Abs(Scale.Y),
+		FMath::Abs(Scale.Z)
 	);
 }
 }
@@ -550,10 +550,7 @@ FVector AMouseDeployableCaptureTool::GetPlacementCollisionExtent() const
 		return FVector(MinimumPlacementExtent);
 	}
 
-	const FVector Scale = GetAbsoluteScale(
-		Mesh->GetRelativeScale3D(),
-		GetActorScale3D()
-	);
+	const FVector Scale = GetAbsoluteScale(GetActorScale3D());
 
 	return FVector(
 		FMath::Max(MinimumPlacementExtent, LocalExtent.X * Scale.X),
@@ -582,7 +579,6 @@ FVector AMouseDeployableCaptureTool::GetPlacementCollisionCenter(
 	const FVector LocalCenter =
 		(LocalBoundsMin + LocalBoundsMax) * 0.5f;
 	const FVector Scale = GetAbsoluteScale(
-		Mesh->GetRelativeScale3D(),
 		PlacementTransform.GetScale3D()
 	);
 	const FVector ScaledLocalCenter(
@@ -612,10 +608,7 @@ float AMouseDeployableCaptureTool::GetPlacementGroundOffset() const
 		LocalBoundsMax
 	);
 
-	const FVector Scale = GetAbsoluteScale(
-		Mesh->GetRelativeScale3D(),
-		GetActorScale3D()
-	);
+	const FVector Scale = GetAbsoluteScale(GetActorScale3D());
 
 	return FMath::Max(
 		0.0f,
@@ -648,15 +641,6 @@ void AMouseDeployableCaptureTool::UpdateLocalPlacementPreview(
 	if (PlacementPreviewMesh)
 	{
 		FTransform PreviewMeshTransform = PreviewTransform;
-
-		if (Mesh)
-		{
-			const FVector PreviewScale =
-				Mesh->GetRelativeScale3D() *
-				PreviewTransform.GetScale3D();
-
-			PreviewMeshTransform.SetScale3D(PreviewScale);
-		}
 
 		PlacementPreviewMesh->SetWorldTransform(
 			PreviewMeshTransform,
