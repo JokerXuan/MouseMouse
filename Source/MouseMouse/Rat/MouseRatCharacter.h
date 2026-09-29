@@ -10,6 +10,7 @@ class USceneComponent;
 class AMouseFoodActor;
 class AMouseRatCardActor;
 class AMouseRatNest;
+class URatDefinition;
 
 UCLASS()
 class MOUSEMOUSE_API AMouseRatCharacter : public ACharacter
@@ -41,6 +42,12 @@ public:
 	AMouseRatNest* GetHomeNest() const
 	{
 		return HomeNest;
+	}
+
+	/** Returns this rat's configured identity data. */
+	URatDefinition* GetRatDefinition() const
+	{
+		return RatDefinition;
 	}
 
 	/** Radius within which a player first becomes a threat to this rat. */
@@ -151,6 +158,14 @@ protected:
 		Category = "Rat|Capture"
 	)
 	TSubclassOf<AMouseRatCardActor> RatCardClass;
+
+	/** Identity data copied to the RatCard when this rat is captured. */
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Rat|Identity"
+	)
+	TObjectPtr<URatDefinition> RatDefinition;
 
 	/** Radius within which the server first detects a player as a threat. */
 	UPROPERTY(

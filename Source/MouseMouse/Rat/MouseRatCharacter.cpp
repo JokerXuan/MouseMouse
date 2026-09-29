@@ -11,6 +11,7 @@
 #include "MouseMouse.h"
 #include "Net/UnrealNetwork.h"
 #include "Rat/MouseRatAIController.h"
+#include "Rat/RatDefinition.h"
 #include "Rat/MouseRatNest.h"
 
 
@@ -491,6 +492,8 @@ bool AMouseRatCharacter::TryCapture()
 
 		return false;
 	}
+
+	RatCard->SetRatDefinition(RatDefinition);
 
 	// A newly spawned pickup must enter the same unheld, dropped state used by
 	// the existing food and generic pickup actors.

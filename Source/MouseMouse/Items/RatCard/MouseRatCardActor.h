@@ -6,6 +6,8 @@
 #include "Items/MousePickupActor.h"
 #include "MouseRatCardActor.generated.h"
 
+class URatDefinition;
+
 /**
  * World pickup created when a rat is captured.
  *
@@ -19,4 +21,25 @@ class MOUSEMOUSE_API AMouseRatCardActor : public AMousePickupActor
 
 public:
 	AMouseRatCardActor();
+
+	URatDefinition* GetRatDefinition() const
+	{
+		return RatDefinition;
+	}
+
+	/** Sets the card identity on the server before replication. */
+	void SetRatDefinition(URatDefinition* NewRatDefinition);
+
+	virtual void GetLifetimeReplicatedProps(
+		TArray<FLifetimeProperty>& OutLifetimeProps
+	) const override;
+
+protected:
+	UPROPERTY(
+		Replicated,
+		VisibleInstanceOnly,
+		BlueprintReadOnly,
+		Category = "Rat Card|Identity"
+	)
+	TObjectPtr<URatDefinition> RatDefinition;
 };
