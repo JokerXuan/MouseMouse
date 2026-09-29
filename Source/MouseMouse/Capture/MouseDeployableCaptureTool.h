@@ -65,6 +65,7 @@ protected:
 		ACharacter* OldHolder,
 		ACharacter* NewHolder
 	) override;
+	virtual bool ShouldSimulatePhysicsWhenUnheld() const override;
 
 	/** The server-owned overlap area that asks rats to capture themselves. */
 	UPROPERTY(
@@ -144,7 +145,7 @@ protected:
 	/** Server-only timer callback that activates an unheld arming tool. */
 	void FinishArming();
 
-	/** Applies local capture-area behavior and optional Blueprint presentation. */
+	/** Applies capture, physics, and optional Blueprint presentation state. */
 	void ApplyToolState();
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Capture")

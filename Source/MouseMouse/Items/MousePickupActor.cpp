@@ -128,9 +128,21 @@ void AMousePickupActor::ApplyHolderState()
 
 		SetActorEnableCollision(true);
 
-		Mesh->SetSimulatePhysics(true);
-		Mesh->WakeAllRigidBodies();
+		const bool bShouldSimulatePhysics =
+			ShouldSimulatePhysicsWhenUnheld();
+
+		Mesh->SetSimulatePhysics(bShouldSimulatePhysics);
+
+		if (bShouldSimulatePhysics)
+		{
+			Mesh->WakeAllRigidBodies();
+		}
 	}
+}
+
+bool AMousePickupActor::ShouldSimulatePhysicsWhenUnheld() const
+{
+	return true;
 }
 
 void AMousePickupActor::OnHolderChanged(

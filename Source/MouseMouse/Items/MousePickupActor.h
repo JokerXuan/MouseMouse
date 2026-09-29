@@ -70,6 +70,12 @@ protected:
 	void ApplyHolderState();
 
 	/**
+	 * Allows specialized pickups to keep an unheld world state kinematic.
+	 * Generic pickups continue to simulate physics after a normal drop.
+	 */
+	virtual bool ShouldSimulatePhysicsWhenUnheld() const;
+
+	/**
 	 * Server-only extension point for pickup subclasses that need to react to
 	 * their holder changing. The base pickup behavior remains unchanged.
 	 */

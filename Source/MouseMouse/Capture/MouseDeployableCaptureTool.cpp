@@ -241,6 +241,11 @@ void AMouseDeployableCaptureTool::OnHolderChanged(
 	}
 }
 
+bool AMouseDeployableCaptureTool::ShouldSimulatePhysicsWhenUnheld() const
+{
+	return ToolState == ECaptureToolState::Inactive;
+}
+
 void AMouseDeployableCaptureTool::SetToolState(
 	ECaptureToolState NewState
 )
@@ -328,6 +333,11 @@ void AMouseDeployableCaptureTool::ApplyToolState()
 			);
 		}
 	}
+
+	// HolderCharacter and ToolState replicate independently. Reapplying the
+	// holder state here makes either RepNotify order converge on the same
+	// physics and collision result.
+	ApplyHolderState();
 
 	if (ToolState != ECaptureToolState::Held)
 	{
