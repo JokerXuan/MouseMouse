@@ -35,6 +35,16 @@ public:
 	) const override;
 
 protected:
+	/**
+	 * A card registers its capture exactly once, when it first enters a player's
+	 * hands on the server. Dropping or trading the persistent world actor does
+	 * not change the team codex again.
+	 */
+	virtual void OnHolderChanged(
+		ACharacter* OldHolder,
+		ACharacter* NewHolder
+	) override;
+
 	UPROPERTY(
 		Replicated,
 		VisibleInstanceOnly,
@@ -42,4 +52,13 @@ protected:
 		Category = "Rat Card|Identity"
 	)
 	TObjectPtr<URatDefinition> RatDefinition;
+
+	/** Server-owned one-shot guard for this physical card actor. */
+	UPROPERTY(
+		Replicated,
+		VisibleInstanceOnly,
+		BlueprintReadOnly,
+		Category = "Rat Card|Codex"
+	)
+	bool bHasRegisteredCapture = false;
 };
