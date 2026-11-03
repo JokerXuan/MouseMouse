@@ -3,6 +3,7 @@
 
 #include "Core/MouseMouseGameState.h"
 
+#include "MouseMouse.h"
 #include "Net/UnrealNetwork.h"
 #include "Rat/RatDefinition.h"
 
@@ -23,6 +24,48 @@ void AMouseMouseGameState::GetLifetimeReplicatedProps(
 		AMouseMouseGameState,
 		TeamRatCodex
 	);
+	DOREPLIFETIME(AMouseMouseGameState, RoundState);
+}
+
+bool AMouseMouseGameState::TryTransitionRoundPhase(ERoundPhase NewPhase)
+{
+	if (!HasAuthority())
+	{
+		return false;
+	}
+
+	const bool bStarting = RoundState.Phase == ERoundPhase::Waiting &&
+		NewPhase == ERoundPhase::InProgress;
+	const bool bFinishing = RoundState.Phase == ERoundPhase::InProgress &&
+		(NewPhase == ERoundPhase::Succeeded || NewPhase == ERoundPhase::Failed);
+	if (!bStarting && !bFinishing)
+	{
+		return false;
+	}
+
+	const FMouseRoundState PreviousState = RoundState;
+	RoundState.Phase = NewPhase;
+	if (bStarting)
+	{
+		++RoundState.RoundId;
+	}
+
+	ForceNetUpdate();
+	// RepNotify is not invoked automatically for authoritative C++ assignments.
+	OnRep_RoundState(PreviousState);
+	return true;
+}
+
+void AMouseMouseGameState::OnRep_RoundState(FMouseRoundState PreviousState)
+{
+	// Snapshot the new state so a server listener can safely finish during the callback.
+	const FMouseRoundState NewState = RoundState;
+	UE_LOG(LogMouseMouse, Log, TEXT("Round %d: %s -> %s (%s)."),
+		NewState.RoundId,
+		*UEnum::GetValueAsString(PreviousState.Phase),
+		*UEnum::GetValueAsString(NewState.Phase),
+		HasAuthority() ? TEXT("Server") : TEXT("Client"));
+	OnRoundStateChanged.Broadcast(PreviousState, NewState);
 }
 
 bool AMouseMouseGameState::RegisterCapturedRat(

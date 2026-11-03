@@ -7,7 +7,37 @@
 #include "MouseMouseGameState.generated.h"
 
 class APlayerState;
+class AMouseMouseGameMode;
 class URatDefinition;
+
+/** Objective-driven round phases; results are terminal for this world. */
+UENUM(BlueprintType)
+enum class ERoundPhase : uint8
+{
+	Waiting,
+	InProgress,
+	Succeeded,
+	Failed
+};
+
+/** Persistent round snapshot. RoundId is zero before the first start, then one. */
+USTRUCT(BlueprintType)
+struct MOUSEMOUSE_API FMouseRoundState
+{
+	GENERATED_BODY()
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Round")
+	ERoundPhase Phase = ERoundPhase::Waiting;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Round")
+	int32 RoundId = 0;
+};
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+	FOnMouseRoundStateChanged,
+	const FMouseRoundState&, PreviousState,
+	const FMouseRoundState&, NewState
+);
 
 /** One team-wide capture record for a rat definition. */
 USTRUCT(BlueprintType)
@@ -34,6 +64,21 @@ class MOUSEMOUSE_API AMouseMouseGameState : public AGameStateBase
 	
 public:
 	AMouseMouseGameState();
+
+	/** Read-only snapshot on server or client, including the state for late joiners. */
+	UFUNCTION(BlueprintPure, Category = "Round")
+	FMouseRoundState GetRoundState() const
+	{
+		return RoundState;
+	}
+
+	/**
+	 * Local notification on the server and receiving clients. Bind future HUDs here
+	 * and also read GetRoundState() when binding, since replication may arrive first.
+	 * Replication delivers current state; it may coalesce intermediate transitions.
+	 */
+	UPROPERTY(BlueprintAssignable, Category = "Round")
+	FOnMouseRoundStateChanged OnRoundStateChanged;
 
 	/** Persistent, team-shared codex. Late joiners receive this through replication. */
 	UPROPERTY(Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Rat Codex")
@@ -74,4 +119,16 @@ public:
 		int32 CapturedCount,
 		bool bFirstDiscovery
 	);
+
+private:
+	friend class AMouseMouseGameMode;
+
+	/** Only GameMode can request a transition; no client setter or RPC is exposed. */
+	bool TryTransitionRoundPhase(ERoundPhase NewPhase);
+
+	UFUNCTION()
+	void OnRep_RoundState(FMouseRoundState PreviousState);
+
+	UPROPERTY(ReplicatedUsing = OnRep_RoundState)
+	FMouseRoundState RoundState;
 };
